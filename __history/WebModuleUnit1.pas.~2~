@@ -1,0 +1,422 @@
+unit WebModuleUnit1;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, Web.HTTPApp, Data.DB, Datasnap.DBClient, Data.SqlExpr,
+  Soap.InvokeRegistry, Soap.WSDLIntf, System.TypInfo, Soap.WebServExp,
+  Soap.WSDLBind, Xml.XMLSchema, Soap.WSDLPub, Soap.SOAPPasInv,
+  Soap.SOAPHTTPPasInv, Soap.SOAPHTTPDisp, Soap.WebBrokerSOAP;
+
+type
+  TWebModule1 = class(TWebModule)
+    procedure WebModuleCreate(Sender: TObject);
+  private
+    function JSONListToJSON(Query: TSQLQuery): string;
+  public
+    // Authors Handlers
+    procedure GetAuthorsListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure AddAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure UpdateAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure DeleteAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+
+    // Genres Handlers
+    procedure GetGenresListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure AddGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure UpdateGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure DeleteGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+
+    // Books Handlers
+    procedure GetBooksListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure AddBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure UpdateBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure DeleteBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+
+    // Customers Handlers
+    procedure GetCustomersListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure AddCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure UpdateCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure DeleteCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+
+    // Sales Handlers
+    procedure GetSalesListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure AddSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure UpdateSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+    procedure DeleteSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+  end;
+
+var
+  WebModuleClass: TComponentClass = TWebModule1;
+
+implementation
+
+{%CLASSGROUP 'Vcl.Controls.TControl'}
+
+{$R *.dfm}
+
+procedure TWebModule1.WebModuleCreate(Sender: TObject);
+begin
+  SQLConnection1.Open;
+end;
+
+function TWebModule1.JSONListToJSON(Query: TSQLQuery): string;
+var
+  JSONArray: TJSONArray;
+  JSONObj: TJSONObject;
+  I: Integer;
+begin
+  JSONArray := TJSONArray.Create;
+  try
+    while not Query.Eof do
+    begin
+      JSONObj := TJSONObject.Create;
+      for I := 0 to Query.FieldCount - 1 do
+      begin
+        JSONObj.AddPair(Query.Fields[I].FieldName, Query.Fields[I].AsString);
+      end;
+      JSONArray.AddElement(JSONObj);
+      Query.Next;
+    end;
+    Result := JSONArray.ToString;
+  finally
+    JSONArray.Free;
+  end;
+end;
+
+// Authors Handlers
+procedure TWebModule1.GetAuthorsListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+begin
+  SQLQuery1.SQL.Text := 'SELECT * FROM Authors';
+  SQLQuery1.Open;
+
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+  Handled := True;
+end;
+
+procedure TWebModule1.AddAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  AuthorName: string;
+  BirthDate: TDate;
+begin
+  AuthorName := Request.ContentFields.Values['Name'];
+  BirthDate := StrToDate(Request.ContentFields.Values['BirthDate']);
+
+  SQLQuery1.SQL.Text := 'INSERT INTO Authors (Name, BirthDate) VALUES (:Name, :BirthDate)';
+  SQLQuery1.ParamByName('Name').AsString := AuthorName;
+  SQLQuery1.ParamByName('BirthDate').AsDate := BirthDate;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.UpdateAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  AuthorID: Integer;
+  AuthorName: string;
+  BirthDate: TDate;
+begin
+  AuthorID := StrToInt(Request.ContentFields.Values['AuthorID']);
+  AuthorName := Request.ContentFields.Values['Name'];
+  BirthDate := StrToDate(Request.ContentFields.Values['BirthDate']);
+
+  SQLQuery1.SQL.Text := 'UPDATE Authors SET Name = :Name, BirthDate = :BirthDate WHERE AuthorID = :AuthorID';
+  SQLQuery1.ParamByName('AuthorID').AsInteger := AuthorID;
+  SQLQuery1.ParamByName('Name').AsString := AuthorName;
+  SQLQuery1.ParamByName('BirthDate').AsDate := BirthDate;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.DeleteAuthorAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  AuthorID: Integer;
+begin
+  AuthorID := StrToInt(Request.ContentFields.Values['AuthorID']);
+
+  SQLQuery1.SQL.Text := 'DELETE FROM Authors WHERE AuthorID = :AuthorID';
+  SQLQuery1.ParamByName('AuthorID').AsInteger := AuthorID;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+// Genres Handlers
+procedure TWebModule1.GetGenresListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+begin
+  SQLQuery1.SQL.Text := 'SELECT * FROM Genres';
+  SQLQuery1.Open;
+
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+  Handled := True;
+end;
+
+procedure TWebModule1.AddGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  GenreName: string;
+begin
+  GenreName := Request.ContentFields.Values['GenreName'];
+
+  SQLQuery1.SQL.Text := 'INSERT INTO Genres (GenreName) VALUES (:GenreName)';
+  SQLQuery1.ParamByName('GenreName').AsString := GenreName;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.UpdateGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  GenreID: Integer;
+  GenreName: string;
+begin
+  GenreID := StrToInt(Request.ContentFields.Values['GenreID']);
+  GenreName := Request.ContentFields.Values['GenreName'];
+
+  SQLQuery1.SQL.Text := 'UPDATE Genres SET GenreName = :GenreName WHERE GenreID = :GenreID';
+  SQLQuery1.ParamByName('GenreID').AsInteger := GenreID;
+  SQLQuery1.ParamByName('GenreName').AsString := GenreName;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.DeleteGenreAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  GenreID: Integer;
+begin
+  GenreID := StrToInt(Request.ContentFields.Values['GenreID']);
+
+  SQLQuery1.SQL.Text := 'DELETE FROM Genres WHERE GenreID = :GenreID';
+  SQLQuery1.ParamByName('GenreID').AsInteger := GenreID;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+// Books Handlers
+procedure TWebModule1.GetBooksListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+begin
+  SQLQuery1.SQL.Text := 'SELECT * FROM Books';
+  SQLQuery1.Open;
+
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+  Handled := True;
+end;
+
+procedure TWebModule1.AddBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  Title: string;
+  AuthorID, GenreID: Integer;
+  Price: Double;
+  PublishedYear: Integer;
+begin
+  Title := Request.ContentFields.Values['Title'];
+  AuthorID := StrToInt(Request.ContentFields.Values['AuthorID']);
+  GenreID := StrToInt(Request.ContentFields.Values['GenreID']);
+  Price := StrToFloat(Request.ContentFields.Values['Price']);
+  PublishedYear := StrToInt(Request.ContentFields.Values['PublishedYear']);
+
+  SQLQuery1.SQL.Text := 'INSERT INTO Books (Title, AuthorID, GenreID, Price, PublishedYear) VALUES (:Title, :AuthorID, :GenreID, :Price, :PublishedYear)';
+  SQLQuery1.ParamByName('Title').AsString := Title;
+  SQLQuery1.ParamByName('AuthorID').AsInteger := AuthorID;
+  SQLQuery1.ParamByName('GenreID').AsInteger := GenreID;
+  SQLQuery1.ParamByName('Price').AsFloat := Price;
+  SQLQuery1.ParamByName('PublishedYear').AsInteger := PublishedYear;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.UpdateBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  BookID: Integer;
+  Title: string;
+  AuthorID, GenreID: Integer;
+  Price: Double;
+  PublishedYear: Integer;
+begin
+  BookID := StrToInt(Request.ContentFields.Values['BookID']);
+  Title := Request.ContentFields.Values['Title'];
+  AuthorID := StrToInt(Request.ContentFields.Values['AuthorID']);
+  GenreID := StrToInt(Request.ContentFields.Values['GenreID']);
+  Price := StrToFloat(Request.ContentFields.Values['Price']);
+  PublishedYear := StrToInt(Request.ContentFields.Values['PublishedYear']);
+
+  SQLQuery1.SQL.Text := 'UPDATE Books SET Title = :Title, AuthorID = :AuthorID, GenreID = :GenreID, Price = :Price, PublishedYear = :PublishedYear WHERE BookID = :BookID';
+  SQLQuery1.ParamByName('BookID').AsInteger := BookID;
+  SQLQuery1.ParamByName('Title').AsString := Title;
+  SQLQuery1.ParamByName('AuthorID').AsInteger := AuthorID;
+  SQLQuery1.ParamByName('GenreID').AsInteger := GenreID;
+  SQLQuery1.ParamByName('Price').AsFloat := Price;
+  SQLQuery1.ParamByName('PublishedYear').AsInteger := PublishedYear;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.DeleteBookAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  BookID: Integer;
+begin
+  BookID := StrToInt(Request.ContentFields.Values['BookID']);
+
+  SQLQuery1.SQL.Text := 'DELETE FROM Books WHERE BookID = :BookID';
+  SQLQuery1.ParamByName('BookID').AsInteger := BookID;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+// Customers Handlers
+procedure TWebModule1.GetCustomersListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+begin
+  SQLQuery1.SQL.Text := 'SELECT * FROM Customers';
+  SQLQuery1.Open;
+
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+  Handled := True;
+end;
+
+procedure TWebModule1.AddCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  FullName, Email, PhoneNumber: string;
+begin
+  FullName := Request.ContentFields.Values['FullName'];
+  Email := Request.ContentFields.Values['Email'];
+  PhoneNumber := Request.ContentFields.Values['PhoneNumber'];
+
+  SQLQuery1.SQL.Text := 'INSERT INTO Customers (FullName, Email, PhoneNumber) VALUES (:FullName, :Email, :PhoneNumber)';
+  SQLQuery1.ParamByName('FullName').AsString := FullName;
+  SQLQuery1.ParamByName('Email').AsString := Email;
+  SQLQuery1.ParamByName('PhoneNumber').AsString := PhoneNumber;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.UpdateCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  CustomerID: Integer;
+  FullName, Email, PhoneNumber: string;
+begin
+  CustomerID := StrToInt(Request.ContentFields.Values['CustomerID']);
+  FullName := Request.ContentFields.Values['FullName'];
+  Email := Request.ContentFields.Values['Email'];
+  PhoneNumber := Request.ContentFields.Values['PhoneNumber'];
+
+  SQLQuery1.SQL.Text := 'UPDATE Customers SET FullName = :FullName, Email = :Email, PhoneNumber = :PhoneNumber WHERE CustomerID = :CustomerID';
+  SQLQuery1.ParamByName('CustomerID').AsInteger := CustomerID;
+  SQLQuery1.ParamByName('FullName').AsString := FullName;
+  SQLQuery1.ParamByName('Email').AsString := Email;
+  SQLQuery1.ParamByName('PhoneNumber').AsString := PhoneNumber;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.DeleteCustomerAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  CustomerID: Integer;
+begin
+  CustomerID := StrToInt(Request.ContentFields.Values['CustomerID']);
+
+  SQLQuery1.SQL.Text := 'DELETE FROM Customers WHERE CustomerID = :CustomerID';
+  SQLQuery1.ParamByName('CustomerID').AsInteger := CustomerID;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+// Sales Handlers
+procedure TWebModule1.GetSalesListAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+begin
+  SQLQuery1.SQL.Text := 'SELECT * FROM Sales';
+  SQLQuery1.Open;
+
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+  Handled := True;
+end;
+
+procedure TWebModule1.AddSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  BookID, CustomerID, Quantity: Integer;
+  SaleDate: TDate;
+  TotalPrice: Double;
+begin
+  BookID := StrToInt(Request.ContentFields.Values['BookID']);
+  CustomerID := StrToInt(Request.ContentFields.Values['CustomerID']);
+  Quantity := StrToInt(Request.ContentFields.Values['Quantity']);
+  SaleDate := StrToDate(Request.ContentFields.Values['SaleDate']);
+  TotalPrice := StrToFloat(Request.ContentFields.Values['TotalPrice']);
+
+  SQLQuery1.SQL.Text := 'INSERT INTO Sales (BookID, CustomerID, SaleDate, Quantity, TotalPrice) VALUES (:BookID, :CustomerID, :SaleDate, :Quantity, :TotalPrice)';
+  SQLQuery1.ParamByName('BookID').AsInteger := BookID;
+  SQLQuery1.ParamByName('CustomerID').AsInteger := CustomerID;
+  SQLQuery1.ParamByName('SaleDate').AsDate := SaleDate;
+  SQLQuery1.ParamByName('Quantity').AsInteger := Quantity;
+  SQLQuery1.ParamByName('TotalPrice').AsFloat := TotalPrice;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.UpdateSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  SaleID, BookID, CustomerID, Quantity: Integer;
+  SaleDate: TDate;
+  TotalPrice: Double;
+begin
+  SaleID := StrToInt(Request.ContentFields.Values['SaleID']);
+  BookID := StrToInt(Request.ContentFields.Values['BookID']);
+  CustomerID := StrToInt(Request.ContentFields.Values['CustomerID']);
+  Quantity := StrToInt(Request.ContentFields.Values['Quantity']);
+  SaleDate := StrToDate(Request.ContentFields.Values['SaleDate']);
+  TotalPrice := StrToFloat(Request.ContentFields.Values['TotalPrice']);
+
+  SQLQuery1.SQL.Text := 'UPDATE Sales SET BookID = :BookID, CustomerID = :CustomerID, SaleDate = :SaleDate, Quantity = :Quantity, TotalPrice = :TotalPrice WHERE SaleID = :SaleID';
+  SQLQuery1.ParamByName('SaleID').AsInteger := SaleID;
+  SQLQuery1.ParamByName('BookID').AsInteger := BookID;
+  SQLQuery1.ParamByName('CustomerID').AsInteger := CustomerID;
+  SQLQuery1.ParamByName('SaleDate').AsDate := SaleDate;
+  SQLQuery1.ParamByName('Quantity').AsInteger := Quantity;
+  SQLQuery1.ParamByName('TotalPrice').AsFloat := TotalPrice;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+procedure TWebModule1.DeleteSaleAction(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  SaleID: Integer;
+begin
+  SaleID := StrToInt(Request.ContentFields.Values['SaleID']);
+
+  SQLQuery1.SQL.Text := 'DELETE FROM Sales WHERE SaleID = :SaleID';
+  SQLQuery1.ParamByName('SaleID').AsInteger := SaleID;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+  Handled := True;
+end;
+
+end.
+

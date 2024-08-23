@@ -1,0 +1,117 @@
+unit WebModuleUnit1;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, Web.HTTPApp, Data.DB, Data.SqlExpr, System.JSON,
+  Soap.InvokeRegistry, Soap.WSDLIntf, System.TypInfo, Soap.WebServExp,
+  Soap.WSDLBind, Xml.XMLSchema, Soap.WSDLPub, Soap.SOAPPasInv,
+  Soap.SOAPHTTPPasInv, Soap.SOAPHTTPDisp, Soap.WebBrokerSOAP, Data.DBXMySQL,
+  Data.FMTBcd, Datasnap.DBClient;
+
+type
+  TWebModule1 = class(TWebModule)
+    SQLQuery1: TSQLQuery;
+    SQLConnection1: TSQLConnection;
+    DataSource1: TDataSource;
+    ClientDataSet1: TClientDataSet;
+    procedure WebModule1Action(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+  private
+    procedure HandleGetRequest(TableName: string; Request: TWebRequest; Response: TWebResponse);
+    procedure HandlePostRequest(TableName: string; Request: TWebRequest; Response: TWebResponse; Action: string);
+    function JSONListToJSON(Query: TSQLQuery): string;
+  public
+  end;
+
+var
+  WebModule1: TWebModule1;
+
+implementation
+
+{%CLASSGROUP 'System.Classes.TPersistent'}
+
+{$R *.dfm}
+
+function TWebModule1.JSONListToJSON(Query: TSQLQuery): string;
+var
+  JSONArray: TJSONArray;
+  JSONObject: TJSONObject;
+begin
+  JSONArray := TJSONArray.Create;
+  try
+    Query.First;
+    while not Query.Eof do
+    begin
+      JSONObject := TJSONObject.Create;
+      for var i := 0 to Query.FieldCount - 1 do
+        JSONObject.AddPair(Query.Fields[i].FieldName, Query.Fields[i].AsString);
+      JSONArray.AddElement(JSONObject);
+      Query.Next;
+    end;
+    Result := JSONArray.ToString;
+  finally
+    JSONArray.Free;
+  end;
+end;
+
+procedure TWebModule1.HandleGetRequest(TableName: string; Request: TWebRequest; Response: TWebResponse);
+begin
+  SQLQuery1.SQL.Text := Format('SELECT * FROM %s', [TableName]);
+  SQLQuery1.Open;
+  Response.ContentType := 'application/json';
+  Response.Content := JSONListToJSON(SQLQuery1);
+end;
+
+procedure TWebModule1.HandlePostRequest(TableName: string; Request: TWebRequest; Response: TWebResponse; Action: string);
+var
+  SQL: string;
+begin
+  if Action = 'Add' then
+    SQL := Format('INSERT INTO %s (%s) VALUES (%s)', [TableName, Request.ContentFields.Values['Fields'], Request.ContentFields.Values['Values']])
+  else if Action = 'Update' then
+    SQL := Format('UPDATE %s SET %s WHERE %s', [TableName, Request.ContentFields.Values['Set'], Request.ContentFields.Values['Where']])
+  else if Action = 'Delete' then
+    SQL := Format('DELETE FROM %s WHERE %s', [TableName, Request.ContentFields.Values['Where']]);
+
+  SQLQuery1.SQL.Text := SQL;
+  SQLQuery1.ExecSQL;
+
+  Response.Content := '{"status":"success"}';
+end;
+
+procedure TWebModule1.WebModule1Action(Sender: TObject; Request: TWebRequest; Response: TWebResponse; var Handled: Boolean);
+var
+  Path: string;
+  Action: string;
+  TableName: string;
+begin
+  Path := Request.PathInfo;
+
+  if Path.StartsWith('/Get') then
+  begin
+    TableName := Copy(Path, 5, MaxInt);
+    HandleGetRequest(TableName, Request, Response);
+  end
+  else if Path.StartsWith('/Add') then
+  begin
+    TableName := Copy(Path, 5, MaxInt);
+    HandlePostRequest(TableName, Request, Response, 'Add');
+  end
+  else if Path.StartsWith('/Update') then
+  begin
+    TableName := Copy(Path, 8, MaxInt);
+    HandlePostRequest(TableName, Request, Response, 'Update');
+  end
+  else if Path.StartsWith('/Delete') then
+  begin
+    TableName := Copy(Path, 8, MaxInt);
+    HandlePostRequest(TableName, Request, Response, 'Delete');
+  end
+  else
+    Response.Content := '{"status":"error", "message":"Not Found"}';
+
+  Handled := True;
+end;
+
+end.
+
